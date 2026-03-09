@@ -54,7 +54,7 @@ const parseFraction = (input: string): string => {
     // Remove quotes and "in" suffix if present
     const trimmed = input.trim().replace(/"/g, '').replace(/in/gi, '');
     if (!trimmed) return "";
-    
+
     // Check if it's already a valid decimal or integer
     if (/^\d*\.?\d+$/.test(trimmed)) return trimmed;
 
@@ -66,7 +66,7 @@ const parseFraction = (input: string): string => {
         const whole = match[1] ? parseInt(match[1], 10) : 0;
         const numerator = parseInt(match[2], 10);
         const denominator = parseInt(match[3], 10);
-        
+
         if (denominator !== 0) {
             const decimal = whole + (numerator / denominator);
             // Limit to 3 decimal places for surfboard dimensions (e.g., 2.375)
@@ -101,7 +101,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
     const [appliedCode, setAppliedCode] = useState<DiscountCode | null>(null);
     const [discountError, setDiscountError] = useState<string | null>(null);
     const [discountSuccess, setDiscountSuccess] = useState<string | null>(null);
-    const [isSaving, setIsSaving] = useState(false); 
+    const [isSaving, setIsSaving] = useState(false);
     const [isValidatingCode, setIsValidatingCode] = useState(false);
 
     const newImageBlobs = React.useRef<Map<string, { full: Blob, thumb: Blob }>>(new Map());
@@ -163,7 +163,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
 
     const handleDimensionChange = (index: number, field: string, value: string) => {
         setBoard(prev => {
-            const newDimensions = prev.dimensions.map((dim, i) => 
+            const newDimensions = prev.dimensions.map((dim, i) =>
                 i === index ? { ...dim, [field]: value } : dim
             );
             return { ...prev, dimensions: newDimensions };
@@ -193,7 +193,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
 
     const handleApplyDiscount = async () => {
         if (!discountCode.trim()) return;
-        
+
         setDiscountError(null);
         setDiscountSuccess(null);
         setAppliedCode(null);
@@ -202,7 +202,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
         try {
             const q = query(collection(db, "discountCodes"), where("name", "==", discountCode.trim().toUpperCase()));
             const querySnapshot = await getDocs(q);
-            
+
             if (querySnapshot.empty) {
                 setDiscountError("Invalid code. Try again");
                 return;
@@ -224,11 +224,11 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
                 setDiscountError("Invalid code for your country.");
                 return;
             }
-            
+
             // Check appliesTo
             if (codeData.appliesTo !== condition) {
-                 setDiscountError(`This code only applies to ${codeData.appliesTo} boards.`);
-                 return;
+                setDiscountError(`This code only applies to ${codeData.appliesTo} boards.`);
+                return;
             }
 
             // Check usage limit
@@ -251,7 +251,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
         if (e.target.files) {
             const currentCount = board.images.length;
             const remaining = 6 - currentCount;
-            
+
             if (remaining <= 0) {
                 alert("You can only upload a maximum of 6 images.");
                 return;
@@ -314,9 +314,9 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
         }
 
         const areDimensionsValid = board.dimensions.every(dim =>
-            parseFloat(dim.length) > 0 && 
-            parseFloat(dim.width) > 0 && 
-            parseFloat(dim.thickness) > 0 && 
+            parseFloat(dim.length) > 0 &&
+            parseFloat(dim.width) > 0 &&
+            parseFloat(dim.thickness) > 0 &&
             parseFloat(dim.volume) > 0
         );
 
@@ -352,7 +352,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
         for (const img of imageParams) {
             if (img.startsWith('http')) {
                 uploadedUrls.push(img);
-                let thumbUrl = img; 
+                let thumbUrl = img;
                 if (editingBoard && editingBoard.images && editingBoard.thumbnails) {
                     const originalIndex = editingBoard.images.indexOf(img);
                     if (originalIndex !== -1 && editingBoard.thumbnails[originalIndex]) {
@@ -405,9 +405,9 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
                 status: SurfboardStatus.Live,
                 listedDate: now.toISOString(),
                 firstListedDate: now.toISOString(),
-                isPaid: appliedCode ? true : false, 
+                isPaid: appliedCode ? true : false,
                 discountCodeId: appliedCode ? appliedCode.id : undefined,
-                expiresAt: expiresAt.toISOString(), 
+                expiresAt: expiresAt.toISOString(),
             } as Omit<Surfboard, 'id'>;
         } catch (error) {
             console.error(error);
@@ -468,11 +468,11 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
         // Option A: Save current form data to cart then open cart
         const data = await getListingData();
         if (data) {
-           const location = getLocationData();
-           if (isEditing || currentUser.location || location) {
-               onStageAndReset([data], location);
-               resetForm();
-           }
+            const location = getLocationData();
+            if (isEditing || currentUser.location || location) {
+                onStageAndReset([data], location);
+                resetForm();
+            }
         }
         onOpenCart();
     };
@@ -480,7 +480,7 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
     const currencySymbol = getCurrencySymbol(currentUser.country);
     const newBoardFee = getNewBoardFee(currentUser.country);
     const usedBoardFee = getUsedBoardFee(currentUser.country);
-    
+
     const currentTotal = condition === Condition.New
         ? board.dimensions.length * newBoardFee
         : board.dimensions.length * usedBoardFee;
@@ -527,36 +527,36 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
                                 {board.dimensions.map((dim, index) => (
                                     <div key={index} className="relative flex flex-col gap-4">
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                                            <FormInput 
-                                                label="Length (ft)" 
-                                                name="length" 
-                                                type="text" 
-                                                value={dim.length} 
-                                                onChange={(e) => handleDimensionChange(index, 'length', e.target.value)} 
+                                            <FormInput
+                                                label="Length (ft)"
+                                                name="length"
+                                                type="text"
+                                                value={dim.length}
+                                                onChange={(e) => handleDimensionChange(index, 'length', e.target.value)}
                                                 onBlur={(e) => handleDimensionBlur(index, 'length', e.target.value)}
                                             />
-                                            <FormInput 
-                                                label="Width (in)" 
-                                                name="width" 
-                                                type="text" 
-                                                value={dim.width} 
-                                                onChange={(e) => handleDimensionChange(index, 'width', e.target.value)} 
+                                            <FormInput
+                                                label="Width (in)"
+                                                name="width"
+                                                type="text"
+                                                value={dim.width}
+                                                onChange={(e) => handleDimensionChange(index, 'width', e.target.value)}
                                                 onBlur={(e) => handleDimensionBlur(index, 'width', e.target.value)}
                                             />
-                                            <FormInput 
-                                                label="Thickness (in)" 
-                                                name="thickness" 
-                                                type="text" 
-                                                value={dim.thickness} 
-                                                onChange={(e) => handleDimensionChange(index, 'thickness', e.target.value)} 
+                                            <FormInput
+                                                label="Thickness (in)"
+                                                name="thickness"
+                                                type="text"
+                                                value={dim.thickness}
+                                                onChange={(e) => handleDimensionChange(index, 'thickness', e.target.value)}
                                                 onBlur={(e) => handleDimensionBlur(index, 'thickness', e.target.value)}
                                             />
-                                            <FormInput 
-                                                label="Volume (L)" 
-                                                name="volume" 
-                                                type="text" 
-                                                value={dim.volume} 
-                                                onChange={(e) => handleDimensionChange(index, 'volume', e.target.value)} 
+                                            <FormInput
+                                                label="Volume (L)"
+                                                name="volume"
+                                                type="text"
+                                                value={dim.volume}
+                                                onChange={(e) => handleDimensionChange(index, 'volume', e.target.value)}
                                                 onBlur={(e) => handleDimensionBlur(index, 'volume', e.target.value)}
                                             />
                                         </div>
@@ -608,12 +608,12 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
                                 <div className="flex items-center gap-4">
                                     <label className={`px-4 py-1.5 border border-[#cbd5e0] rounded-full text-sm font-semibold transition-colors ${board.images.length >= 6 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-[#4a5568] cursor-pointer hover:bg-gray-50'}`}>
                                         Choose files
-                                        <input 
-                                            type="file" 
-                                            multiple 
-                                            accept="image/*" 
-                                            onChange={handleImageChange} 
-                                            className="hidden" 
+                                        <input
+                                            type="file"
+                                            multiple
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                            className="hidden"
                                             disabled={board.images.length >= 6}
                                         />
                                     </label>
@@ -671,19 +671,28 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
                         <div className="bg-gray-50 p-4 rounded-lg">
                             <div className="flex items-end gap-2">
                                 <div className="flex-grow">
-                                    <FormInput 
-                                        label="Discount code" 
-                                        name="discountCode" 
-                                        value={discountCode} 
-                                        onChange={(e) => setDiscountCode(e.target.value)} 
+                                    <FormInput
+                                        label="Discount code"
+                                        name="discountCode"
+                                        value={discountCode}
+                                        onChange={(e) => {
+                                            setDiscountCode(e.target.value);
+                                            if (appliedCode) {
+                                                setAppliedCode(null);
+                                                setDiscountSuccess(null);
+                                            }
+                                            if (discountError) {
+                                                setDiscountError(null);
+                                            }
+                                        }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault();
                                                 handleApplyDiscount();
                                             }
                                         }}
-                                        placeholder="Enter code" 
-                                        required={false} 
+                                        placeholder="Enter code"
+                                        required={false}
                                     />
                                 </div>
                                 <button

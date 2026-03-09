@@ -671,7 +671,7 @@ const App: React.FC = () => {
                         ...board,
                         id: newId,
                         sellerId: currentUser.id,
-                        status: board.condition === Condition.New ? SurfboardStatus.PendingVerification : SurfboardStatus.Live,
+                        status: SurfboardStatus.Live,
                         listedDate: now.toISOString(),
                         expiresAt: new Date(now.getTime() + (90 * 24 * 60 * 60 * 1000)).toISOString(),
                         isPaid: false,
