@@ -1,0 +1,28 @@
+{
+  "name": "SurfDims - Surfboard Marketplace",
+  "short_name": "SurfDims",
+  "description": "A web application for buying and selling new and second-hand surfboards.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#123156",
+  "theme_color": "#123156",
+  "icons": [
+    {
+      "src": "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0093965307.firebasestorage.app/o/Icons%2FManifest-icon2.svg?alt=media&token=0fcafbd8-01a1-4c75-ae33-fcd47df701b9",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0093965307.firebasestorage.app/o/Icons%2FManifest-icon2.svg?alt=media&token=0fcafbd8-01a1-4c75-ae33-fcd47df701b9",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://firebasestorage.googleapis.com/v0/b/gen-lang-client-0093965307.firebasestorage.app/o/Icons%2FManifest-icon2.svg?alt=media&token=0fcafbd8-01a1-4c75-ae33-fcd47df701b9",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}

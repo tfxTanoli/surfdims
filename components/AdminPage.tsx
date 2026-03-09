@@ -1,0 +1,504 @@
+
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { Surfboard, User, BrandingState, AppSettingsState, DonationEntry, AdminAd, SurfboardStatus, DiscountCode } from '../types';
+import { DEFAULT_BRANDING } from '../constants';
+import { db, storage } from '../firebase';
+import { collection, query, onSnapshot, setDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import XIcon from './icons/XIcon';
+import TrashIcon from './icons/TrashIcon';
+import AppIntegrations from './AppIntegrations';
+import GiveawaysManager from './GiveawaysManager';
+import DiscountCodesManager from './DiscountCodesManager';
+import TicketIcon from './icons/TicketIcon';
+import SearchIcon from './icons/SearchIcon';
+import DownloadIcon from './icons/DownloadIcon';
+import AdsManager from './AdsManager';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import CheckCircleIcon from './icons/CheckCircleIcon';
+
+interface AdminPageProps {
+    boards: Surfboard[];
+    users: User[];
+    donationEntries: DonationEntry[];
+    branding: BrandingState;
+    appSettings: AppSettingsState;
+    giveawayImages: string[];
+    adminAds: AdminAd[];
+    onAdminDeleteListing: (boardId: string) => void;
+    onAdminApproveListing: (boardId: string) => void;
+    onAdminToggleUserBlock: (userId: string) => void;
+    onAdminDeleteUser: (userId: string) => void;
+    onBrandingUpdate: (newBranding: BrandingState) => void;
+    onAppSettingsUpdate: (newSettings: AppSettingsState) => void;
+    onGiveawayImagesUpdate: (images: string[]) => void;
+    onAdminAdsUpdate: (ads: AdminAd[]) => void;
+    onClose: () => void;
+}
+
+const BrandingManager: React.FC<{
+    currentBranding: BrandingState,
+    onUpdateBranding: (newBranding: BrandingState) => void,
+}> = ({ currentBranding, onUpdateBranding }) => {
+    const [branding, setBranding] = useState(currentBranding);
+    const [desktopFile, setDesktopFile] = useState<File | null>(null);
+    const [mobileFile, setMobileFile] = useState<File | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'desktop' | 'mobile') => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            const previewUrl = URL.createObjectURL(file);
+
+            if (type === 'desktop') {
+                setDesktopFile(file);
+                setBranding(prev => ({ ...prev, desktopLogo: previewUrl }));
+            } else {
+                setMobileFile(file);
+                setBranding(prev => ({ ...prev, mobileLogo: previewUrl }));
+            }
+        }
+    };
+
+    const handleSaveChanges = async () => {
+        setIsLoading(true);
+        try {
+            let newDesktopUrl = branding.desktopLogo;
+            let newMobileUrl = branding.mobileLogo;
+
+            if (desktopFile) {
+                const desktopRef = ref(storage, `branding/desktop_logo_${Date.now()}`);
+                const snapshot = await uploadBytes(desktopRef, desktopFile);
+                newDesktopUrl = await getDownloadURL(snapshot.ref);
+            }
+
+            if (mobileFile) {
+                const mobileRef = ref(storage, `branding/mobile_logo_${Date.now()}`);
+                const snapshot = await uploadBytes(mobileRef, mobileFile);
+                newMobileUrl = await getDownloadURL(snapshot.ref);
+            }
+
+            const updatedBranding = {
+                ...branding,
+                desktopLogo: newDesktopUrl,
+                mobileLogo: newMobileUrl
+            };
+
+            setBranding(updatedBranding);
+            onUpdateBranding(updatedBranding);
+            setDesktopFile(null);
+            setMobileFile(null);
+            alert('Branding updated successfully!');
+        } catch (error) {
+            console.error("Error uploading branding images:", error);
+            alert("Failed to update branding. Please try again.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleReset = () => {
+        if (window.confirm('Are you sure you want to reset the branding to the default?')) {
+            setBranding(DEFAULT_BRANDING);
+            onUpdateBranding(DEFAULT_BRANDING);
+            setDesktopFile(null);
+            setMobileFile(null);
+        }
+    };
+
+    return (
+        <div className="bg-gray-50 p-6 rounded-lg">
+            <h3 className="text-xl font-semibold text-gray-700 mb-6">Manage Site Branding</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                    <h4 className="font-semibold text-gray-800 mb-2">Desktop Logo</h4>
+                    <p className="text-sm text-gray-500 mb-3">Recommended: SVG or transparent PNG.</p>
+                    <input
+                        type="file"
+                        accept="image/svg+xml, image/png, image/jpeg"
+                        onChange={(e) => handleFileChange(e, 'desktop')}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4"
+                    />
+                    <div className="p-4 border rounded-lg bg-white">
+                        <p className="text-xs text-gray-500 mb-2">Preview:</p>
+                        <div className="bg-[#25425c] p-4 rounded-md flex justify-center">
+                            <img src={branding.desktopLogo} alt="Desktop logo preview" className="h-16 object-contain" />
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h4 className="font-semibold text-gray-800 mb-2">Mobile Logo (Optional)</h4>
+                    <p className="text-sm text-gray-500 mb-3">A compact version for small screens.</p>
+                    <input
+                        type="file"
+                        accept="image/svg+xml, image/png, image/jpeg"
+                        onChange={(e) => handleFileChange(e, 'mobile')}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-4"
+                    />
+                    <div className="p-4 border rounded-lg bg-white">
+                        <p className="text-xs text-gray-500 mb-2">Preview:</p>
+                        <div className="bg-[#25425c] p-4 rounded-md flex justify-center">
+                            {branding.mobileLogo ? (
+                                <img src={branding.mobileLogo} alt="Mobile logo preview" className="h-10 object-contain" />
+                            ) : (
+                                <p className="text-sm text-gray-400">No mobile logo set.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div className="mt-8 flex gap-4">
+                <button
+                    onClick={handleSaveChanges}
+                    disabled={isLoading}
+                    className={`py-2 px-6 font-semibold rounded-lg shadow-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition ${isLoading ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                    {isLoading ? 'Uploading...' : 'Save Changes'}
+                </button>
+                <button
+                    onClick={handleReset}
+                    disabled={isLoading}
+                    className="py-2 px-6 font-semibold rounded-lg shadow-md bg-gray-600 hover:bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition"
+                >
+                    Reset to Default
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListing, onAdminApproveListing, onAdminToggleUserBlock, onAdminDeleteUser, onClose, branding, onBrandingUpdate, appSettings, onAppSettingsUpdate, giveawayImages, onGiveawayImagesUpdate, adminAds, onAdminAdsUpdate }) => {
+    const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'branding' | 'apps' | 'giveaways' | 'discountCodes' | 'ads'>('listings');
+    const [userSearchTerm, setUserSearchTerm] = useState('');
+    const [listingSearchTerm, setListingSearchTerm] = useState('');
+    const [discountCodes, setDiscountCodes] = useState<DiscountCode[]>([]);
+
+    const [visibleListingsCount, setVisibleListingsCount] = useState(20);
+    const [visibleUsersCount, setVisibleUsersCount] = useState(20);
+
+    const sellerMap: Map<string, User> = useMemo(() => new Map<string, User>(users.map(u => [u.id, u])), [users]);
+
+    useEffect(() => {
+        const q = query(collection(db, "discountCodes"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const codes: DiscountCode[] = [];
+            snapshot.forEach((doc) => {
+                codes.push({ id: doc.id, ...doc.data() } as DiscountCode);
+            });
+            setDiscountCodes(codes);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const filteredUsers = useMemo(() => {
+        if (!userSearchTerm.trim()) return users;
+        const lowercasedFilter = userSearchTerm.toLowerCase();
+        return users.filter(user =>
+            user.name.toLowerCase().includes(lowercasedFilter) ||
+            user.email.toLowerCase().includes(lowercasedFilter)
+        );
+    }, [users, userSearchTerm]);
+
+    const paginatedUsers = useMemo(() => filteredUsers.slice(0, visibleUsersCount), [filteredUsers, visibleUsersCount]);
+
+    const filteredBoards = useMemo(() => {
+        if (!listingSearchTerm.trim()) return boards;
+        const lowercasedFilter = listingSearchTerm.toLowerCase();
+        return boards.filter(board => {
+            const seller = sellerMap.get(board.sellerId);
+            const searchString = [
+                board.brand,
+                board.model,
+                seller?.name,
+                seller?.email
+            ].filter(Boolean).join(' ').toLowerCase();
+            return searchString.includes(lowercasedFilter);
+        });
+    }, [boards, listingSearchTerm, sellerMap]);
+
+    const paginatedBoards = useMemo(() => filteredBoards.slice(0, visibleListingsCount), [filteredBoards, visibleListingsCount]);
+
+    const handleDownloadUsersCSV = useCallback(() => {
+        const sortedUsers = [...users].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        const headers = ['ID', 'Name', 'Email', 'Phone', 'Location', 'Country', 'Verified', 'Blocked', 'Role', 'Signed Up At'];
+        const escapeCsvField = (field: any) => {
+            const stringField = String(field ?? '');
+            if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                return `"${stringField.replace(/"/g, '""')}"`;
+            }
+            return stringField;
+        };
+        const csvRows = [
+            headers.join(','),
+            ...sortedUsers.map(user =>
+                [
+                    user.id,
+                    user.name,
+                    user.email,
+                    user.phone,
+                    user.location,
+                    user.country,
+                    user.isVerified,
+                    user.isBlocked,
+                    user.role || 'user',
+                    new Date(user.createdAt).toLocaleString(),
+                ].map(escapeCsvField).join(',')
+            )
+        ];
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        const today = new Date().toISOString().slice(0, 10);
+        link.setAttribute('download', `surfdims_users_${today}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }, [users]);
+
+    const handleCreateDiscountCode = async (code: Omit<DiscountCode, 'id' | 'createdAt'>) => {
+        try {
+            const id = `code-${Date.now()}`;
+            await setDoc(doc(db, "discountCodes", id), {
+                ...code,
+                createdAt: new Date().toISOString()
+            });
+            alert('Discount code created successfully!');
+        } catch (error: any) {
+            console.error("Error creating discount code:", error);
+            alert(`Failed to create code: ${error.message}`);
+            throw error; // Rethrow to let the modal handle it
+        }
+    };
+
+    const handleDeleteDiscountCode = async (id: string) => {
+        if (window.confirm('Delete this discount code?')) {
+            try {
+                await deleteDoc(doc(db, "discountCodes", id));
+                alert('Discount code deleted.');
+            } catch (error: any) {
+                console.error("Error deleting discount code:", error);
+                alert(`Failed to delete code: ${error.message}`);
+            }
+        }
+    };
+
+    const TabButton: React.FC<{ tabName: typeof activeTab; children: React.ReactNode }> = ({ tabName, children }) => (
+        <button
+            onClick={() => setActiveTab(tabName)}
+            className={`whitespace-nowrap py-3 px-4 font-medium text-sm transition-colors rounded-t-lg ${activeTab === tabName
+                ? 'bg-white border-b-0 text-blue-600'
+                : 'bg-gray-100 text-gray-500 hover:text-gray-700'
+                }`}
+        >
+            {children}
+        </button>
+    );
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-start py-10 overflow-y-auto">
+            <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-6xl relative animate-fade-in-down">
+                <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition">
+                    <XIcon />
+                </button>
+                <h2 className="text-3xl font-bold text-gray-800 mb-6">Admin Panel</h2>
+
+                <div className="border-b border-gray-200">
+                    <nav className="-mb-px flex space-x-2 overflow-x-auto" aria-label="Tabs">
+                        <TabButton tabName="listings">Manage Listings ({boards.length})</TabButton>
+                        <TabButton tabName="users">Manage Users ({users.length})</TabButton>
+                        <TabButton tabName="discountCodes">Discount codes ({discountCodes.length})</TabButton>
+                        <TabButton tabName="ads">Ads</TabButton>
+                        <TabButton tabName="branding">Branding</TabButton>
+                        <TabButton tabName="giveaways">Giveaways</TabButton>
+                        <TabButton tabName="apps">Apps</TabButton>
+                    </nav>
+                </div>
+
+                <div className="mt-8">
+                    {activeTab === 'listings' && (
+                        <div>
+                            <div className="mb-4 relative">
+                                <input
+                                    type="text"
+                                    placeholder="Search by brand, model, seller name or email..."
+                                    value={listingSearchTerm}
+                                    onChange={(e) => {
+                                        setListingSearchTerm(e.target.value);
+                                        setVisibleListingsCount(20);
+                                    }}
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <SearchIcon className="h-5 w-5 text-gray-400" />
+                                </div>
+                            </div>
+                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                                {paginatedBoards.length > 0 ? (
+                                    <>
+                                        {paginatedBoards.map(board => {
+                                            const seller = sellerMap.get(board.sellerId);
+                                            const imageUrl = board.images && board.images.length > 0
+                                                ? board.images[0]
+                                                : `https://placehold.co/200x160/f0f4f8/25425c?text=${encodeURIComponent(board.brand || 'No Image')}`;
+                                            return (
+                                                <div key={board.id} className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-4">
+                                                    <img src={imageUrl} alt="Board" className="w-20 h-16 object-cover rounded" />
+                                                    <div className="flex-grow">
+                                                        <p className="font-bold text-gray-800">{board.brand} {board.model}</p>
+                                                        <p className="text-sm text-gray-500">
+                                                            Listed by: <span className="font-medium text-gray-600">{seller?.name || 'Unknown'}</span> ({seller?.email})
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-xs text-gray-500">Status</p>
+                                                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${board.status === 'Live' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{board.status}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        {board.status === SurfboardStatus.PendingVerification && (
+                                                            <button
+                                                                onClick={() => onAdminApproveListing(board.id)}
+                                                                className="p-2 text-green-500 hover:text-green-700 hover:bg-green-50 rounded-full"
+                                                                title="Approve Listing"
+                                                            >
+                                                                <CheckCircleIcon />
+                                                            </button>
+                                                        )}
+                                                        <button onClick={() => onAdminDeleteListing(board.id)} className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full" aria-label="Delete listing">
+                                                            <TrashIcon />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {visibleListingsCount < filteredBoards.length && (
+                                            <div className="pt-4 pb-2 text-center">
+                                                <button
+                                                    onClick={() => setVisibleListingsCount(prev => prev + 20)}
+                                                    className="py-2 px-6 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition"
+                                                >
+                                                    Show More
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-center py-10">
+                                        <p className="text-gray-500">No listings found.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'users' && (
+                        <div>
+                            <div className="mb-4 flex justify-between items-center">
+                                <div className="relative flex-grow">
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name or email..."
+                                        value={userSearchTerm}
+                                        onChange={(e) => {
+                                            setUserSearchTerm(e.target.value);
+                                            setVisibleUsersCount(20);
+                                        }}
+                                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <SearchIcon className="h-5 w-5 text-gray-400" />
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handleDownloadUsersCSV}
+                                    className="ml-4 flex-shrink-0 flex items-center gap-2 py-2 px-4 font-semibold rounded-lg shadow-md bg-green-600 hover:bg-green-700 text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition"
+                                >
+                                    <DownloadIcon />
+                                    Download List
+                                </button>
+                            </div>
+                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                                {paginatedUsers.length > 0 ? (
+                                    <>
+                                        {paginatedUsers.map(user => (
+                                            <div key={user.id} className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-4">
+                                                <img src={user.avatar} alt="User" className="w-12 h-12 object-cover rounded-full" />
+                                                <div className="flex-grow">
+                                                    <p className="font-bold text-gray-800">{user.name}</p>
+                                                    <p className="text-sm text-gray-500">{user.email}</p>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <button
+                                                        onClick={() => onAdminToggleUserBlock(user.id)}
+                                                        className={`w-24 text-sm font-semibold py-1 px-3 rounded-md ${user.isBlocked ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                                                    >
+                                                        {user.isBlocked ? 'Unblock' : 'Block'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('Are you sure you want to permanently delete this user and all their listings?')) {
+                                                                onAdminDeleteUser(user.id);
+                                                            }
+                                                        }}
+                                                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
+                                                        title="Delete User"
+                                                    >
+                                                        <TrashIcon />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {visibleUsersCount < filteredUsers.length && (
+                                            <div className="pt-4 pb-2 text-center">
+                                                <button
+                                                    onClick={() => setVisibleUsersCount(prev => prev + 20)}
+                                                    className="py-2 px-6 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition"
+                                                >
+                                                    Show More
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-center py-10">
+                                        <p className="text-gray-500">No users found.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                    {activeTab === 'discountCodes' && (
+                        <DiscountCodesManager 
+                            codes={discountCodes} 
+                            onCreate={handleCreateDiscountCode} 
+                            onDelete={handleDeleteDiscountCode} 
+                        />
+                    )}
+                    {activeTab === 'ads' && (
+                        <AdsManager ads={adminAds} onUpdate={onAdminAdsUpdate} />
+                    )}
+                    {activeTab === 'branding' && (
+                        <BrandingManager
+                            currentBranding={branding}
+                            onUpdateBranding={onBrandingUpdate}
+                        />
+                    )}
+                    {activeTab === 'giveaways' && (
+                        <GiveawaysManager
+                            images={giveawayImages}
+                            onUpdate={onGiveawayImagesUpdate}
+                        />
+                    )}
+                    {activeTab === 'apps' && (
+                        <AppIntegrations
+                            appSettings={appSettings}
+                            onUpdate={onAppSettingsUpdate}
+                        />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AdminPage;

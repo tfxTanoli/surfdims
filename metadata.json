@@ -1,0 +1,7 @@
+{
+  "name": "SurfDims - buy, surf, sell, repeat",
+  "description": "A surfboard marketplace where users can list used boards for free or new boards for a small fee. Features advanced dimension-based search and location-aware listing.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
