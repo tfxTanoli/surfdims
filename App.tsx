@@ -697,23 +697,44 @@ const App: React.FC = () => {
                         throw e;
                     }
 
-                    // Increment discount code usage if applicable
-                    if (sanitizedBoard.discountCodeId) {
-                        try {
-                            const codeRef = doc(db, "discountCodes", sanitizedBoard.discountCodeId);
-                            const codeDoc = await getDoc(codeRef);
-                            if (codeDoc.exists()) {
-                                const currentCount = codeDoc.data().usageCount || 0;
-                                await updateDoc(codeRef, { usageCount: currentCount + 1 });
-                            }
-                        } catch (err) {
-                            console.error("Error incrementing discount usage:", err);
-                        }
-                    }
-
                     return sanitizedBoard;
                 });
-                await Promise.all(promises);
+
+                const writtenBoards = await Promise.all(promises);
+
+                // Send any boards with discount codes to the secure backend to activate and increment usage tracking
+                if (paymentIntentId === 'free_discount_code' || paymentIntentId === null) {
+                    const discountMap = new Map<string, string[]>();
+                    writtenBoards.forEach(board => {
+                        if (board.discountCodeId) {
+                            if (!discountMap.has(board.discountCodeId)) discountMap.set(board.discountCodeId, []);
+                            discountMap.get(board.discountCodeId)!.push(board.id);
+                        }
+                    });
+
+                    for (const [discountCodeId, boardIds] of discountMap.entries()) {
+                        try {
+                            const apiUrl = import.meta.env.DEV
+                                ? 'http://localhost:4242/apply-discount'
+                                : '/api/apply-discount';
+
+                            const response = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ discountCodeId, boardIds }),
+                            });
+
+                            if (!response.ok) {
+                                const errorData = await response.json();
+                                console.error('Failed to apply discount securely:', errorData);
+                                alert(`Failed to verify discount code logic: ${errorData.error}`);
+                            }
+                        } catch (err) {
+                            console.error('Network error calling apply-discount API:', err);
+                        }
+                    }
+                }
+
                 if (stagedLocation) {
                     try {
                         const updatedUser: User = { ...currentUser, location: `${stagedLocation.suburb}, ${stagedLocation.region}` };

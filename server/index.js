@@ -80,6 +80,65 @@ app.post('/create-payment-intent', async (req, res) => {
     }
 });
 
+app.post('/apply-discount', express.json(), async (req, res) => {
+    const { discountCodeId, boardIds } = req.body;
+
+    if (!discountCodeId || !boardIds || !Array.isArray(boardIds) || boardIds.length === 0) {
+        return res.status(400).json({ error: 'Missing required parameters: discountCodeId, boardIds' });
+    }
+
+    try {
+        const codeRef = db.collection('discountCodes').doc(discountCodeId);
+        const codeDoc = await codeRef.get();
+
+        if (!codeDoc.exists) {
+            return res.status(404).json({ error: 'Discount code not found.' });
+        }
+
+        const codeData = codeDoc.data();
+        if (!codeData) {
+            return res.status(500).json({ error: 'Failed to read discount code data.' });
+        }
+
+        const now = new Date();
+        const expiry = new Date(codeData.expiryDate);
+        if (expiry < now) {
+            return res.status(400).json({ error: 'This discount code has expired.' });
+        }
+
+        if (codeData.usageLimit !== undefined && codeData.usageCount >= codeData.usageLimit) {
+            return res.status(400).json({ error: 'This discount code has reached its usage limit.' });
+        }
+
+        // Process all boards and mark as paid
+        const batch = db.batch();
+        const nowTimestamp = admin.firestore.Timestamp.now();
+        const expiresAtDate = new Date(nowTimestamp.toMillis() + 365 * 24 * 60 * 60 * 1000); // 1 year
+
+        for (const boardId of boardIds) {
+            const boardRef = db.collection('boards').doc(boardId);
+            batch.update(boardRef, {
+                status: "Live",
+                expiresAt: expiresAtDate.toISOString(),
+                isPaid: true,
+                activeAt: nowTimestamp,
+                paymentVerified: true,
+                paymentIntentId: 'free_discount_code'
+            });
+        }
+
+        // Increment discount usage
+        batch.update(codeRef, { usageCount: (codeData.usageCount || 0) + 1 });
+
+        await batch.commit();
+
+        return res.status(200).json({ success: true, message: 'Discount applied and listings activated.' });
+    } catch (error) {
+        console.error('Error applying discount:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 /**
  * Webhook Handler
  */
