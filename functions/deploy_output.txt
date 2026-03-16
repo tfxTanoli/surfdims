@@ -1,0 +1,20 @@
+﻿
+[1m[37m===[39m Deploying to 'gen-lang-client-0093965307'...[22m
+
+[36m[1mi [22m[39m deploying [1mfunctions[22m
+Running command: npm --prefix "$RESOURCE_DIR" run build
+
+> build
+> echo 'No build step needed'
+
+'No build step needed'
+[32m[1m+ [22m[39m [32m[1mfunctions:[22m[39m Finished running [1mpredeploy[22m script.
+[36m[1mi  functions:[22m[39m preparing codebase [1mdefault[22m for deployment
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudfunctions.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudbuild.googleapis.com[22m is enabled...
+[36m[1mi  artifactregistry:[22m[39m ensuring required API [1martifactregistry.googleapis.com[22m is enabled...
+[33m[1m!  functions:[22m[39m Runtime Node.js 20 will be deprecated on 2026-04-30 and will be decommissioned on 2026-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy
+[33m[1m!  functions:[22m[39m Couldn't find firebase-functions package in your source code. Have you run 'npm install'?
+[36m[1mi  functions:[22m[39m Loading and analyzing source code for codebase default to determine what to deploy
+
+[1m[31mError:[39m[22m An unexpected error has occurred.

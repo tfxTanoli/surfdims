@@ -139,6 +139,65 @@ app.post('/apply-discount', express.json(), async (req, res) => {
     }
 });
 
+app.post('/save-token', express.json(), async (req, res) => {
+    const { token, userId } = req.body;
+
+    if (!token || !userId) {
+        return res.status(400).json({ error: 'Missing required parameters: token, userId' });
+    }
+
+    try {
+        await db.collection('fcmTokens').doc(token).set({
+            userId,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        return res.status(200).json({ success: true, message: 'Push token saved successfully.' });
+    } catch (error) {
+        console.error('Error saving push token:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/test-notification', async (req, res) => {
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ error: 'Missing required parameter: userId' });
+    }
+
+    try {
+        const tokensSnapshot = await db.collection('fcmTokens').where('userId', '==', userId).get();
+        const tokens = [];
+        
+        tokensSnapshot.forEach(doc => {
+            tokens.push(doc.id);
+        });
+
+        if (tokens.length === 0) {
+             return res.status(404).json({ error: 'No push tokens found for this user. Please ensure notifications are allowed.' });
+        }
+
+        const message = {
+            notification: {
+                title: 'Test Notification',
+                body: 'Web push notifications are working correctly!',
+            },
+            tokens: tokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+        
+        return res.status(200).json({ 
+            success: true, 
+            message: `Sent successfully to ${response.successCount} devices.` 
+        });
+    } catch (error) {
+        console.error('Error sending test notification:', error);
+        return res.status(500).json({ error: error.message });
+    }
+});
+
 /**
  * Webhook Handler
  */

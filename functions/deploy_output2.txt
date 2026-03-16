@@ -1,0 +1,91 @@
+﻿
+[1m[37m===[39m Deploying to 'gen-lang-client-0093965307'...[22m
+
+[36m[1mi [22m[39m deploying [1mfunctions[22m
+Running command: npm --prefix "$RESOURCE_DIR" run build
+
+> build
+> echo 'No build step needed'
+
+'No build step needed'
+[32m[1m+ [22m[39m [32m[1mfunctions:[22m[39m Finished running [1mpredeploy[22m script.
+[36m[1mi  functions:[22m[39m preparing codebase [1mdefault[22m for deployment
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudfunctions.googleapis.com[22m is enabled...
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudbuild.googleapis.com[22m is enabled...
+[36m[1mi  artifactregistry:[22m[39m ensuring required API [1martifactregistry.googleapis.com[22m is enabled...
+[33m[1m!  functions:[22m[39m Runtime Node.js 20 will be deprecated on 2026-04-30 and will be decommissioned on 2026-10-30, after which you will not be able to deploy without upgrading. Consider upgrading now to avoid disruption. See https://cloud.google.com/functions/docs/runtime-support for full details on the lifecycle policy
+[33m[1m! [22m[39m [1m[33mfunctions: [39m[22mpackage.json indicates an outdated version of firebase-functions. Please upgrade using [1mnpm install --save firebase-functions@latest[22m in your functions directory.
+[33m[1m! [22m[39m [1m[33mfunctions: [39m[22mPlease note that there will be breaking changes when you upgrade.
+[36m[1mi  functions:[22m[39m Loading and analyzing source code for codebase default to determine what to deploy
+[36m[1mi  functions:[22m[39m You are using a version of firebase-functions SDK (4.9.0) that does not have support for the newest Firebase Extensions features. Please update firebase-functions SDK to >=5.1.0 to use them correctly
+Serving at port 8866
+
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ΓÜÖ∩╕Å  write to custom object with { processEnv: myObject }
+
+[36m[1mi  functions:[22m[39m preparing [1mfunctions[22m directory for uploading...
+node.exe : [33m[1m! 
+[22mDEPRECATION NOTICE: 
+Action required before March 
+2026
+At C:\Users\HP\AppData\Roamin
+g\npm\firebase.ps1:24 char:5
++     & "node$exe"  "$basedir
+/node_modules/firebase-tools/
+lib/bin/fireb ...
++     ~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~
+    + CategoryInfo           
+   : NotSpecified: ([33m[  
+  1m! [22...fore March 20   
+ 26:String) [], RemoteExc    
+eption
+    + FullyQualifiedErrorId  
+   : NativeCommandError
+ 
+
+The functions.config() API 
+and the Cloud Runtime Config 
+service are deprecated. 
+Deploys that rely on 
+functions.config() will fail 
+once Runtime Config shuts 
+down in March 2026.
+
+The legacy 
+functions:config:* CLI 
+commands are deprecated and 
+will be removed before March 
+2026.
+
+Learn how to migrate from 
+functions.config() to the 
+params package:
+
+https://firebase.google.com/d
+ocs/functions/config-env#migr
+ate-config
+
+To convert existing 
+functions.config() values to 
+params, try the interactive 
+migration command:
+
+  firebase 
+functions:config:export
+[39m
+[36m[1mi [22m[39m [36m[1mfunctions:[22m[39m packaged [1mC:\Users\HP\Downloads\SurfDims5\functions[22m (46.74 KB) for uploading
+[36m[1mi  functions:[22m[39m ensuring required API [1mcloudscheduler.googleapis.com[22m is enabled...
+[32m[1m+  functions:[22m[39m [1mfunctions[22m source uploaded successfully
+[36m[1mi  functions:[22m[39m creating Node.js 20 (1st Gen) function [1monBoardUpdate(us-central1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 20 (1st Gen) function [1monBoardCreate(us-central1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 20 (1st Gen) function [1mcheckExpiredListings(us-central1)[22m...
+[36m[1mi  functions:[22m[39m updating Node.js 20 (1st Gen) function [1mcleanupOldListings(us-central1)[22m...
+[32m[1m+ [22m[39m [1m[32mfunctions[cleanupOldListings(us-central1)][39m[22m Successful update operation.
+[32m[1m+ [22m[39m [1m[32mfunctions[checkExpiredListings(us-central1)][39m[22m Successful update operation.
+[32m[1m+ [22m[39m [1m[32mfunctions[onBoardCreate(us-central1)][39m[22m Successful update operation.
+[32m[1m+ [22m[39m [1m[32mfunctions[onBoardUpdate(us-central1)][39m[22m Successful create operation.
+
+[32m[1m+ [22m[39m [1m[4mDeploy complete![24m[22m
+
+[1mProject Console:[22m https://console.firebase.google.com/project/gen-lang-client-0093965307/overview

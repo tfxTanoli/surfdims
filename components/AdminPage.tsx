@@ -28,6 +28,8 @@ interface AdminPageProps {
     onAdminApproveListing: (boardId: string) => void;
     onAdminToggleUserBlock: (userId: string) => void;
     onAdminDeleteUser: (userId: string) => void;
+    onAdminPromoteUser: (userId: string, newRole: 'superadmin' | 'admin' | 'user') => void;
+    currentUser: import('../types').User;
     onBrandingUpdate: (newBranding: BrandingState) => void;
     onAppSettingsUpdate: (newSettings: AppSettingsState) => void;
     onGiveawayImagesUpdate: (images: string[]) => void;
@@ -166,7 +168,7 @@ const BrandingManager: React.FC<{
     );
 };
 
-const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListing, onAdminApproveListing, onAdminToggleUserBlock, onAdminDeleteUser, onClose, branding, onBrandingUpdate, appSettings, onAppSettingsUpdate, giveawayImages, onGiveawayImagesUpdate, adminAds, onAdminAdsUpdate }) => {
+const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListing, onAdminApproveListing, onAdminToggleUserBlock, onAdminDeleteUser, onAdminPromoteUser, currentUser, onClose, branding, onBrandingUpdate, appSettings, onAppSettingsUpdate, giveawayImages, onGiveawayImagesUpdate, adminAds, onAdminAdsUpdate }) => {
     const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'branding' | 'apps' | 'giveaways' | 'discountCodes' | 'ads'>('listings');
     const [userSearchTerm, setUserSearchTerm] = useState('');
     const [listingSearchTerm, setListingSearchTerm] = useState('');
@@ -260,10 +262,9 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
     const handleCreateDiscountCode = async (code: Omit<DiscountCode, 'id' | 'createdAt'>) => {
         try {
             const id = `code-${Date.now()}`;
-            await setDoc(doc(db, "discountCodes", id), {
-                ...code,
-                createdAt: new Date().toISOString()
-            });
+            const codeData: any = { ...code, createdAt: new Date().toISOString() };
+            if (codeData.usageLimit === undefined) delete codeData.usageLimit;
+            await setDoc(doc(db, "discountCodes", id), codeData);
             alert('Discount code created successfully!');
         } catch (error: any) {
             console.error("Error creating discount code:", error);
@@ -420,34 +421,104 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
                             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
                                 {paginatedUsers.length > 0 ? (
                                     <>
-                                        {paginatedUsers.map(user => (
-                                            <div key={user.id} className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-4">
-                                                <img src={user.avatar} alt="User" className="w-12 h-12 object-cover rounded-full" />
-                                                <div className="flex-grow">
-                                                    <p className="font-bold text-gray-800">{user.name}</p>
-                                                    <p className="text-sm text-gray-500">{user.email}</p>
+                                        {paginatedUsers.map(user => {
+                                            const isSelf = user.id === currentUser.id;
+                                            const callerIsSuperAdmin = currentUser.role === 'superadmin' || currentUser.email === 'eyemac2@gmail.com';
+                                            const targetIsSuperAdmin = user.role === 'superadmin';
+                                            const targetIsAdmin = user.role === 'admin';
+
+                                            // Role badge
+                                            const roleBadge = targetIsSuperAdmin
+                                                ? <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full bg-purple-100 text-purple-700 border border-purple-300">Super Admin</span>
+                                                : targetIsAdmin
+                                                    ? <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-300">Admin</span>
+                                                    : null;
+
+                                            // Who can do what:
+                                            // - superadmin: can promote users→admin, admin→superadmin, demote admin→user, demote superadmin→admin (not themselves)
+                                            // - admin: can only promote plain users→admin (cannot touch other admins or superadmins)
+                                            const canPromoteToAdmin = !isSelf && !targetIsAdmin && !targetIsSuperAdmin;
+                                            const canDemoteToUser = !isSelf && targetIsAdmin && !targetIsSuperAdmin && callerIsSuperAdmin;
+                                            const canPromoteToSuperAdmin = !isSelf && targetIsAdmin && callerIsSuperAdmin;
+                                            const canDemoteToAdmin = !isSelf && targetIsSuperAdmin && callerIsSuperAdmin;
+                                            const canDemoteAdminToUser = canDemoteToUser;
+                                            const canDemoteSuperAdminToAdmin = canDemoteToAdmin;
+
+                                            return (
+                                                <div key={user.id} className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-4">
+                                                    <img src={user.avatar} alt="User" className="w-12 h-12 object-cover rounded-full" />
+                                                    <div className="flex-grow min-w-0">
+                                                        <p className="font-bold text-gray-800 flex items-center flex-wrap gap-1">
+                                                            {user.name}
+                                                            {roleBadge}
+                                                        </p>
+                                                        <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                                        {/* Role management buttons */}
+                                                        {canPromoteToAdmin && (
+                                                            <button
+                                                                onClick={() => onAdminPromoteUser(user.id, 'admin')}
+                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition"
+                                                                title="Promote to Admin"
+                                                            >
+                                                                Make Admin
+                                                            </button>
+                                                        )}
+                                                        {canPromoteToSuperAdmin && (
+                                                            <button
+                                                                onClick={() => onAdminPromoteUser(user.id, 'superadmin')}
+                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-purple-500 hover:bg-purple-600 text-white transition"
+                                                                title="Promote to Super Admin"
+                                                            >
+                                                                Make Super Admin
+                                                            </button>
+                                                        )}
+                                                        {canDemoteAdminToUser && (
+                                                            <button
+                                                                onClick={() => onAdminPromoteUser(user.id, 'user')}
+                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition"
+                                                                title="Demote to User"
+                                                            >
+                                                                Demote to User
+                                                            </button>
+                                                        )}
+                                                        {canDemoteSuperAdminToAdmin && (
+                                                            <button
+                                                                onClick={() => onAdminPromoteUser(user.id, 'admin')}
+                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-orange-500 hover:bg-orange-600 text-white transition"
+                                                                title="Demote to Admin"
+                                                            >
+                                                                Demote to Admin
+                                                            </button>
+                                                        )}
+                                                        {/* Block / Unblock - not for superadmins */}
+                                                        {!targetIsSuperAdmin && !isSelf && (
+                                                            <button
+                                                                onClick={() => onAdminToggleUserBlock(user.id)}
+                                                                className={`w-24 text-sm font-semibold py-1 px-3 rounded-md ${user.isBlocked ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                                                            >
+                                                                {user.isBlocked ? 'Unblock' : 'Block'}
+                                                            </button>
+                                                        )}
+                                                        {/* Delete - not for superadmins or self */}
+                                                        {!targetIsSuperAdmin && !isSelf && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm('Are you sure you want to permanently delete this user and all their listings?')) {
+                                                                        onAdminDeleteUser(user.id);
+                                                                    }
+                                                                }}
+                                                                className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
+                                                                title="Delete User"
+                                                            >
+                                                                <TrashIcon />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                    <button
-                                                        onClick={() => onAdminToggleUserBlock(user.id)}
-                                                        className={`w-24 text-sm font-semibold py-1 px-3 rounded-md ${user.isBlocked ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                                                    >
-                                                        {user.isBlocked ? 'Unblock' : 'Block'}
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (window.confirm('Are you sure you want to permanently delete this user and all their listings?')) {
-                                                                onAdminDeleteUser(user.id);
-                                                            }
-                                                        }}
-                                                        className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-full"
-                                                        title="Delete User"
-                                                    >
-                                                        <TrashIcon />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                         {visibleUsersCount < filteredUsers.length && (
                                             <div className="pt-4 pb-2 text-center">
                                                 <button

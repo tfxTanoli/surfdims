@@ -1,0 +1,18 @@
+﻿node.exe : error: unknown option 
+'--database'
+At C:\Users\HP\AppData\Roaming\np
+m\firebase.ps1:24 char:5
++     & "node$exe"  "$basedir/nod
+e_modules/firebase-tools/lib/bin/
+fireb ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~
+    + CategoryInfo              
+: NotSpecified: (err    or: 
+unknown option '--    
+database':String) [],     
+RemoteException
+    + FullyQualifiedErrorI    d 
+: NativeCommandError
+ 

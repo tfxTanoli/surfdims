@@ -157,7 +157,7 @@ export const MOCK_USERS: User[] = [
         notifications: [],
         isBlocked: false,
         isVerified: true,
-        role: 'admin',
+        role: 'superadmin',
         createdAt: new Date('2023-09-01T00:00:00Z').toISOString(),
     },
     {

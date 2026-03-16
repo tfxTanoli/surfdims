@@ -116,7 +116,7 @@ export interface User {
     notifications: AppNotification[];
     isBlocked: boolean;
     isVerified: boolean;
-    role?: 'admin' | 'user';
+    role?: 'superadmin' | 'admin' | 'user';
     createdAt: string;
 }
 

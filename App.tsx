@@ -3,7 +3,7 @@ import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { onAuthStateChanged, signOut, sendEmailVerification } from 'firebase/auth';
 import { doc, getDoc, collection, query, onSnapshot, setDoc, updateDoc, serverTimestamp, deleteDoc } from 'firebase/firestore';
-import { auth, db } from './firebase';
+import { auth, db, setupOnMessageListener } from './firebase';
 import AuthModal from './components/AuthModal';
 import { Surfboard, FilterState, User, SurfboardStatus, ListItem, SortOption, Alert, BrandingState, AppNotification, AppSettingsState, DonationEntry, VerificationFlowStatus, Condition } from './types';
 import { INITIAL_BOARDS, MOCK_USERS, SLIDER_RANGES, DEFAULT_BRANDING, MOCK_ENTRIES } from './constants';
@@ -114,6 +114,7 @@ const App: React.FC = () => {
     const [filters, setFilters] = useState<FilterState>(initialFilters);
     const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
     const [boardToRenewId, setBoardToRenewId] = useState<string | null>(null);
+    const [foregroundNotification, setForegroundNotification] = useState<{title: string, body: string} | null>(null);
 
     // Auth Modal State
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -174,49 +175,8 @@ const App: React.FC = () => {
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
-                try {
-                    const userDoc = await getDoc(doc(db, "users", user.uid));
-                    if (userDoc.exists()) {
-                        const userData = userDoc.data() as User;
-                        let isVerified = userData.isVerified;
-
-                        if (user.emailVerified && !userData.isVerified) {
-                            await updateDoc(doc(db, "users", user.uid), { isVerified: true });
-                            isVerified = true;
-                        }
-
-                        if (user.email === 'eyemac2@gmail.com' && userData.role !== 'admin') {
-                            await updateDoc(doc(db, "users", user.uid), { role: 'admin' });
-                            userData.role = 'admin';
-                            alert('You have been recognized as an admin. Your role has been updated.');
-                        }
-
-                        if (userData.isBlocked) {
-                            await signOut(auth);
-                            alert("Your account has been suspended. Please contact support.");
-                            setIsAuthLoading(false);
-                            return;
-                        }
-
-                        const currentUserData = { ...userData, id: user.uid, isVerified };
-                        setCurrentUser(currentUserData);
-                        setFilters(prev => ({ ...prev, country: currentUserData.country || 'All' }));
-
-                        setUsers(prev => {
-                            const exists = prev.find(u => u.id === user.uid);
-                            if (exists) return prev.map(u => u.id === user.uid ? currentUserData : u);
-                            return [...prev, currentUserData];
-                        });
-                    }
-                } catch (error: any) {
-                    if (error.message && error.message.includes("offline")) {
-                        console.log("Firestore offline, loading from cache if available or waiting for connection...");
-                    } else {
-                        console.error("Error fetching user data:", error);
-                    }
-                } finally {
-                    setIsAuthLoading(false);
-                }
+                // Remove individual getDoc as we'll use onSnapshot for real-time updates
+                setIsAuthLoading(false);
             } else {
                 setCurrentUser(null);
                 setFilters(initialFilters);
@@ -247,10 +207,99 @@ const App: React.FC = () => {
                 if (Array.isArray(parsed)) setGiveawayImages(parsed);
             }
         } catch (e) { console.error(e); }
+
+        setupOnMessageListener((payload: any) => {
+            console.log('Received foreground message', payload);
+            setForegroundNotification({
+                title: payload?.notification?.title || 'Notification',
+                body: payload?.notification?.body || 'You have a new message.'
+            });
+            setTimeout(() => setForegroundNotification(null), 5000); // 5 seconds display
+        });
+
         return () => unsubscribe();
     }, []);
 
+    // Unified current user document listener
     useEffect(() => {
+        if (!auth.currentUser) return;
+
+        const unsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), (userDoc) => {
+            if (userDoc.exists()) {
+                const userData = userDoc.data() as User;
+                const isVerified = userData.isVerified || (auth.currentUser?.emailVerified ?? false);
+                let role = userData.role;
+                if (auth.currentUser?.email === 'eyemac2@gmail.com') {
+                    role = 'superadmin';
+                }
+                const currentUserData = { ...userData, id: auth.currentUser.uid, isVerified, role };
+
+                setCurrentUser(currentUserData);
+                setFilters(prev => ({ ...prev, country: currentUserData.country || 'All' }));
+
+                // Update users list with current user data
+                setUsers(prev => {
+                    const exists = prev.find(u => u.id === auth.currentUser?.uid);
+                    if (exists) return prev.map(u => u.id === auth.currentUser?.uid ? currentUserData : u);
+                    return [...prev, currentUserData];
+                });
+            }
+        }, (error) => {
+            console.error("Current User document listener error:", error);
+        });
+
+        // Request and save push token once when user logs in (not on every doc change)
+        import('./firebase').then(({ requestPushToken }) => {
+            requestPushToken().then((token) => {
+                if (token) {
+                    const apiUrl = import.meta.env.DEV
+                        ? 'http://localhost:4242/save-token'
+                        : '/api/save-token';
+
+                    fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ token, userId: auth.currentUser?.uid })
+                    }).catch(err => console.error("Error saving push token:", err));
+                }
+            }).catch(err => console.error("Error requesting push token:", err));
+        }).catch(err => console.error("Error importing firebase for messaging:", err));
+
+        return () => unsubscribe();
+    }, [auth.currentUser]);
+
+    // Handle user data synchronization (verification, admin role)
+    useEffect(() => {
+        if (!currentUser || !auth.currentUser) return;
+
+        const syncUserData = async () => {
+            try {
+                const updates: Partial<User> = {};
+                
+                // Auto-verify if email is verified but Firestore is not updated
+                if (auth.currentUser?.emailVerified && !currentUser.isVerified) {
+                    updates.isVerified = true;
+                }
+
+                // Force superadmin role for the specific email if not already set
+                if (auth.currentUser?.email === 'eyemac2@gmail.com' && currentUser.role !== 'superadmin') {
+                    updates.role = 'superadmin';
+                }
+
+                if (Object.keys(updates).length > 0) {
+                    await setDoc(doc(db, "users", auth.currentUser.uid), updates, { merge: true });
+                }
+            } catch (error) {
+                console.error("Error syncing user data to Firestore:", error);
+            }
+        };
+
+        syncUserData();
+    }, [currentUser?.id, currentUser?.isVerified, currentUser?.role, auth.currentUser?.emailVerified]);
+
+    useEffect(() => {
+        if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin' && currentUser?.email !== 'eyemac2@gmail.com') return;
+
         const q = query(collection(db, "users"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const usersData: User[] = [];
@@ -264,11 +313,10 @@ const App: React.FC = () => {
                 return Array.from(userMap.values());
             });
         }, (error) => {
-            console.error("Users listener error:", error);
-            // If permission denied, we fall back to mock users or whatever we have in state
+            console.error("Admin Users collection listener error:", error);
         });
         return () => unsubscribe();
-    }, []);
+    }, [currentUser?.role]);
 
     useEffect(() => {
         const q = query(collection(db, "boards"));
@@ -815,42 +863,29 @@ const App: React.FC = () => {
 
     const handleUpdateBoard = useCallback(async (updatedBoard: Surfboard) => {
         try {
-            const oldBoard = boards.find(b => b.id === updatedBoard.id);
-            const priceChanged = oldBoard && oldBoard.price !== updatedBoard.price;
-
-            await updateDoc(doc(db, "boards", updatedBoard.id), updatedBoard as any);
+            // Only send editable fields to avoid Firestore rules rejecting immutable field changes
+            const editableFields: Record<string, any> = {
+                brand: updatedBoard.brand,
+                model: updatedBoard.model,
+                price: updatedBoard.price,
+                dimensions: updatedBoard.dimensions,
+                finSystem: updatedBoard.finSystem,
+                finSetup: updatedBoard.finSetup,
+                description: updatedBoard.description,
+                images: updatedBoard.images,
+                thumbnails: updatedBoard.thumbnails || [],
+            };
+            await updateDoc(doc(db, "boards", updatedBoard.id), editableFields);
             setIsListingFormOpen(false);
             setEditingBoard(null);
             setSelectedBoardId(updatedBoard.id);
             alert('Your listing has been updated!');
-
-            if (priceChanged) {
-                // Notify users who have this in favs
-                const usersToNotify = users.filter(u => (u.favs || []).includes(updatedBoard.id) && u.id !== updatedBoard.sellerId);
-                for (const user of usersToNotify) {
-                    const newNotification: AppNotification = {
-                        id: Math.random().toString(36).substr(2, 9),
-                        type: NotificationType.PriceDrop,
-                        message: `Price drop on ${updatedBoard.brand} ${updatedBoard.model}: now ${getCurrencySymbol(user.country)}${updatedBoard.price}`,
-                        boardId: updatedBoard.id,
-                        isRead: false,
-                        createdAt: new Date().toISOString()
-                    };
-                    const updatedUser = {
-                        ...user,
-                        notifications: [newNotification, ...(user.notifications || [])]
-                    };
-                    await setDoc(doc(db, "users", user.id), updatedUser);
-                    if (currentUser && user.id === currentUser.id) {
-                        setCurrentUser(updatedUser);
-                    }
-                }
-            }
+            // Price drop notifications are handled server-side by the onBoardUpdate Cloud Function
         } catch (error) {
             console.error("Error updating board", error);
             alert("Failed to update listing.");
         }
-    }, [boards, users, db, currentUser]);
+    }, [boards, db]);
 
     const handleBrandingUpdate = useCallback(async (newBranding: BrandingState) => {
         setBranding(newBranding);
@@ -1401,7 +1436,7 @@ const App: React.FC = () => {
 
     const handleAdminApproveListing = useCallback(async (boardId: string) => {
         try {
-            await updateDoc(doc(db, "boards", boardId), { status: SurfboardStatus.Live });
+            await setDoc(doc(db, "boards", boardId), { status: SurfboardStatus.Live }, { merge: true });
             setBoards(prev => prev.map(b => b.id === boardId ? { ...b, status: SurfboardStatus.Live } : b));
             alert('Listing has been approved and is now live.');
         } catch (error) {
@@ -1416,7 +1451,7 @@ const App: React.FC = () => {
         const action = user.isBlocked ? 'unblock' : 'block';
         if (window.confirm(`Are you sure you want to ${action} this user?`)) {
             try {
-                await updateDoc(doc(db, "users", userId), { isBlocked: !user.isBlocked });
+                await setDoc(doc(db, "users", userId), { isBlocked: !user.isBlocked }, { merge: true });
                 setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, isBlocked: !u.isBlocked } : u));
                 alert(`User has been ${action}ed.`);
             } catch (error) {
@@ -1441,6 +1476,21 @@ const App: React.FC = () => {
             alert(`Failed to delete user: ${error.message}`);
         }
     }, [boards]);
+
+    const handleAdminPromoteUser = useCallback(async (userId: string, newRole: 'superadmin' | 'admin' | 'user') => {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+        const roleLabels: Record<string, string> = { superadmin: 'Super Admin', admin: 'Admin', user: 'User' };
+        if (!window.confirm(`Change ${user.name}'s role to ${roleLabels[newRole]}?`)) return;
+        try {
+            await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
+            setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+            alert(`${user.name} is now a ${roleLabels[newRole]}.`);
+        } catch (error: any) {
+            console.error('Error changing user role:', error);
+            alert(`Failed to change role: ${error.message}`);
+        }
+    }, [users]);
 
     const handleMarkNotificationAsRead = useCallback((notificationId: string) => {
         if (!currentUser) return;
@@ -1486,6 +1536,31 @@ const App: React.FC = () => {
     const handleOpenLearnMoreFromFaq = useCallback(() => { setIsFaqOpen(false); setIsLearnMoreOpen(true); }, []);
 
     const sellerMap: Map<string, User> = useMemo(() => new Map<string, User>(users.map(u => [u.id, u])), [users]);
+
+    // Lazy load sellers for boards
+    useEffect(() => {
+        if (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') return; // Admins already have all users
+
+        const missingSellerIds = Array.from(new Set(boards.map(b => b.sellerId)))
+            .filter((id): id is string => typeof id === 'string' && id !== '' && !sellerMap.has(id));
+
+        if (missingSellerIds.length === 0) return;
+
+        missingSellerIds.forEach(async (sellerId) => {
+            try {
+                const userDoc = await getDoc(doc(db, "users", sellerId));
+                if (userDoc.exists()) {
+                    const userData = { id: userDoc.id, ...userDoc.data() } as User;
+                    setUsers(prev => {
+                        if (prev.some(u => u.id === sellerId)) return prev;
+                        return [...prev, userData];
+                    });
+                }
+            } catch (error) {
+                console.error(`Error lazy-fetching seller ${sellerId}:`, error);
+            }
+        });
+    }, [boards, sellerMap, currentUser?.role]);
 
     const boardsWithMockPrices = useMemo(() => {
         return boards;
@@ -1641,7 +1716,7 @@ const App: React.FC = () => {
 
     if (location.pathname === '/dashboard') {
         if (isAuthLoading) return <div className="flex items-center justify-center min-h-screen bg-gray-100"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-        if (!currentUser || currentUser.role !== 'admin') return (
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'superadmin' && currentUser.email !== 'eyemac2@gmail.com')) return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100">
                 <div className="bg-white p-8 rounded-lg shadow-md text-center">
                     <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
@@ -1689,6 +1764,8 @@ const App: React.FC = () => {
                     onAdminApproveListing={handleAdminApproveListing}
                     onAdminToggleUserBlock={handleAdminToggleUserBlock}
                     onAdminDeleteUser={handleAdminDeleteUser}
+                    onAdminPromoteUser={handleAdminPromoteUser}
+                    currentUser={currentUser!}
                     onBrandingUpdate={handleBrandingUpdate}
                     onAppSettingsUpdate={handleAppSettingsUpdate}
                     onGiveawayImagesUpdate={handleGiveawayImagesUpdate}
@@ -1747,7 +1824,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {currentUser && !currentUser.isVerified && verificationStatus !== 'verifying' && currentUser.role !== 'admin' && (
+            {currentUser && !currentUser.isVerified && verificationStatus !== 'verifying' && currentUser.role !== 'admin' && currentUser.role !== 'superadmin' && (
                 <VerificationBanner onVerify={handleInitiateVerification} status={verificationStatus} />
             )}
 
@@ -1975,7 +2052,7 @@ const App: React.FC = () => {
                 successMessage={alertCreationSuccessMessage}
                 onViewAlerts={() => { setIsAlertCreationModalOpen(false); setIsMyAlertsOpen(true); }}
             />
-            {currentUser?.role === 'admin' && isAdminPageOpen && (
+            {(currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.email === 'eyemac2@gmail.com') && isAdminPageOpen && (
                 <AdminPage
                     boards={boards}
                     users={users}
@@ -1984,6 +2061,8 @@ const App: React.FC = () => {
                     onAdminApproveListing={handleAdminApproveListing}
                     onAdminToggleUserBlock={handleAdminToggleUserBlock}
                     onAdminDeleteUser={handleAdminDeleteUser}
+                    onAdminPromoteUser={handleAdminPromoteUser}
+                    currentUser={currentUser}
                     branding={branding}
                     onBrandingUpdate={handleBrandingUpdate}
                     appSettings={appSettings}
@@ -2008,6 +2087,21 @@ const App: React.FC = () => {
                     isOpen={isStagedCartOpen}
                     onClose={() => setIsStagedCartOpen(false)}
                 />
+            )}
+            {foregroundNotification && (
+                <div className="fixed top-4 right-4 z-[9999] max-w-sm w-full bg-slate-900 border border-slate-700 text-white shadow-2xl rounded-xl p-4 animate-fade-in-down">
+                    <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 text-left">
+                            <h4 className="text-sm font-semibold mb-1 text-white">{foregroundNotification.title}</h4>
+                            <p className="text-xs text-slate-300">{foregroundNotification.body}</p>
+                        </div>
+                        <button onClick={() => setForegroundNotification(null)} className="text-slate-400 hover:text-white transition group">
+                            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
             )}
             <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} initialView={authModalView} />
         </div>
