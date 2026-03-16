@@ -128,7 +128,7 @@ const ProfileSettings: React.FC<{
                                 showStatus(`Error: ${data.error}`, 'error');
                             }
                         } catch (err) {
-                            showStatus('Network error: The backend server might not be running. Please run "npm run backend" in your terminal.', 'error');
+                            showStatus(import.meta.env.DEV ? 'Network error: The backend server might not be running. Please run "npm run backend" in your terminal.' : 'Network error: Could not reach the server. Please try again.', 'error');
                         }
                     }}
                     className="w-full py-2 px-4 border border-blue-600 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition"
