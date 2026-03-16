@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 // Corrected import: Stripe constructor and type namespace are provided via the default export
 import Stripe from 'stripe';
 import { Buffer } from 'buffer';
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16' as any,
