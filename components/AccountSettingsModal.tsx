@@ -111,9 +111,7 @@ const ProfileSettings: React.FC<{
                     type="button"
                     onClick={async () => {
                         try {
-                            const apiUrl = import.meta.env.DEV
-                                ? 'http://localhost:4242/test-notification'
-                                : '/api/test-notification';
+                            const apiUrl = '/api/test-notification';
                                 
                             const response = await fetch(apiUrl, {
                                 method: 'POST',
@@ -128,7 +126,7 @@ const ProfileSettings: React.FC<{
                                 showStatus(`Error: ${data.error}`, 'error');
                             }
                         } catch (err) {
-                            showStatus(import.meta.env.DEV ? 'Network error: The backend server might not be running. Please run "npm run backend" in your terminal.' : 'Network error: Could not reach the server. Please try again.', 'error');
+                            showStatus('Network error: Could not reach the server. Please try again.', 'error');
                         }
                     }}
                     className="w-full py-2 px-4 border border-blue-600 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition"
@@ -152,9 +150,7 @@ const ProfileSettings: React.FC<{
                                     return;
                                 }
                                 
-                                const apiUrl = import.meta.env.DEV
-                                    ? 'http://localhost:4242/save-token'
-                                    : '/api/save-token';
+                                const apiUrl = '/api/save-token';
                                     
                                 const res = await fetch(apiUrl, {
                                     method: 'POST',

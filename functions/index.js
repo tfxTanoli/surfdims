@@ -2,7 +2,7 @@ const { onDocumentWritten, onDocumentUpdated } = require("firebase-functions/v2/
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
 require('dotenv').config();
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 // Initialize with environment credentials if provided, otherwise default
 if (!admin.apps.length) {
@@ -24,6 +24,40 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 db.settings({ databaseId: 'surfdims' });
+
+/**
+ * Helper to write in-app notifications into each user's Firestore notifications array.
+ */
+async function writeInAppNotifications(userIds, type, message, boardId) {
+    if (!userIds || userIds.length === 0) return;
+    try {
+        // Firestore batch limit is 500 — chunk if needed
+        const chunks = [];
+        for (let i = 0; i < userIds.length; i += 400) {
+            chunks.push(userIds.slice(i, i + 400));
+        }
+        for (const chunk of chunks) {
+            const batch = db.batch();
+            for (const userId of chunk) {
+                const notification = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    type,
+                    message,
+                    boardId: boardId || null,
+                    isRead: false,
+                    createdAt: new Date().toISOString()
+                };
+                batch.update(db.collection('users').doc(userId), {
+                    notifications: FieldValue.arrayUnion(notification)
+                });
+            }
+            await batch.commit();
+        }
+        console.log(`Wrote in-app notifications to ${userIds.length} users.`);
+    } catch (error) {
+        console.error('Error writing in-app notifications:', error);
+    }
+}
 
 /**
  * Helper to construct and send FCM messages.
@@ -154,7 +188,7 @@ exports.onBoardCreate = onDocumentWritten(
 
                 usersSnapshot.forEach(userDoc => {
                     const user = userDoc.data();
-                    if (user.id === afterData.sellerId || !user.alerts || user.alerts.length === 0) return;
+                    if (userDoc.id === afterData.sellerId || !user.alerts || user.alerts.length === 0) return;
 
                     const hasMatch = user.alerts.some(alert => {
                         const brandMatch = !alert.brand || afterData.brand.toLowerCase().includes(alert.brand.toLowerCase());
@@ -174,17 +208,26 @@ exports.onBoardCreate = onDocumentWritten(
                     });
 
                     if (hasMatch) {
-                        matchedUserIds.push(user.id);
+                        matchedUserIds.push(userDoc.id); // use Firestore doc ID, not user.id field
                     }
                 });
 
                 if (matchedUserIds.length > 0) {
-                    await sendPushNotification(
-                        matchedUserIds,
-                        "New Match Alert",
-                        `New listing matches your alert: ${afterData.brand} ${afterData.model}`,
-                        { type: 'AlertMatch', boardId }
-                    );
+                    const alertMsg = `New listing matches your alert: ${afterData.brand} ${afterData.model}`;
+                    await Promise.all([
+                        sendPushNotification(
+                            matchedUserIds,
+                            "New Match Alert",
+                            alertMsg,
+                            { type: 'AlertMatch', boardId }
+                        ),
+                        writeInAppNotifications(
+                            matchedUserIds,
+                            'Alert Match',
+                            alertMsg,
+                            boardId
+                        )
+                    ]);
                     console.log(`Sent alert match notifications to ${matchedUserIds.length} users for board ${boardId}`);
                 }
             }
@@ -213,7 +256,7 @@ exports.onBoardUpdate = onDocumentUpdated(
             usersSnapshot.forEach(doc => {
                 const user = doc.data();
                 if (user.favs && user.favs.includes(boardId)) {
-                    favoritedUserIds.push(user.id);
+                    favoritedUserIds.push(doc.id); // use Firestore doc ID, not user.id field
                 }
             });
 
@@ -231,12 +274,21 @@ exports.onBoardUpdate = onDocumentUpdated(
                     }
                 }
                 const currency = sellerCountry === 'NZ' ? 'NZD' : sellerCountry === 'AU' ? 'AUD' : sellerCountry === 'US' ? 'USD' : sellerCountry;
-                await sendPushNotification(
-                    favoritedUserIds,
-                    "Price Drop Alert",
-                    `Great news! The price for ${after.brand} ${after.model} dropped to $${after.price} ${currency}`,
-                    { type: 'PriceDrop', boardId }
-                );
+                const priceMsg = `Great news! The price for ${after.brand} ${after.model} dropped to $${after.price} ${currency}`;
+                await Promise.all([
+                    sendPushNotification(
+                        favoritedUserIds,
+                        "Price Drop Alert",
+                        priceMsg,
+                        { type: 'PriceDrop', boardId }
+                    ),
+                    writeInAppNotifications(
+                        favoritedUserIds,
+                        'Price Drop',
+                        priceMsg,
+                        boardId
+                    )
+                ]);
                 console.log(`Sent price drop notifications to ${favoritedUserIds.length} users for board ${boardId}`);
             }
         }
@@ -297,7 +349,10 @@ exports.checkExpiredListings = onSchedule("every 24 hours", async (event) => {
                 ? `Your listing for ${titles[0]} has expired. Log in to renew it.`
                 : `You have ${titles.length} expired listings. Log in to renew them.`;
 
-            await sendPushNotification([sellerId], "Listing Expired", body, { type: 'ExpiredListing' });
+            await Promise.all([
+                sendPushNotification([sellerId], "Listing Expired", body, { type: 'ExpiredListing' }),
+                writeInAppNotifications([sellerId], 'Expired Listing', body, null)
+            ]);
         }
 
     } catch (error) {

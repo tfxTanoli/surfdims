@@ -252,9 +252,7 @@ const App: React.FC = () => {
         import('./firebase').then(({ requestPushToken }) => {
             requestPushToken().then((token) => {
                 if (token) {
-                    const apiUrl = import.meta.env.DEV
-                        ? 'http://localhost:4242/save-token'
-                        : '/api/save-token';
+                    const apiUrl = '/api/save-token';
 
                     fetch(apiUrl, {
                         method: 'POST',
@@ -762,9 +760,7 @@ const App: React.FC = () => {
 
                     for (const [discountCodeId, boardIds] of discountMap.entries()) {
                         try {
-                            const apiUrl = import.meta.env.DEV
-                                ? 'http://localhost:4242/apply-discount'
-                                : '/api/apply-discount';
+                            const apiUrl = '/api/apply-discount';
 
                             const response = await fetch(apiUrl, {
                                 method: 'POST',

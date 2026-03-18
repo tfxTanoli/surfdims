@@ -89,9 +89,7 @@ const StripePaymentForm: React.FC<StripePaymentFormProps> = ({ amount, currency,
         try {
             // In development, use the local Node.js backend server.
             // In production (Vercel), use the serverless function path.
-            const apiUrl = import.meta.env.DEV
-                ? 'http://localhost:4242/create-payment-intent'
-                : '/api/create-payment-intent';
+            const apiUrl = '/api/create-payment-intent';
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
