@@ -54,12 +54,12 @@ service cloud.firestore {
       allow read: if true;
       
       // Create: Strict validation
-      allow create: if request.auth != null 
+      allow create: if request.auth != null
                     && request.resource.data.sellerId == request.auth.uid
                     && request.resource.data.ownerId == request.auth.uid
                     && request.resource.data.lifecycleStatus == 'active'
                     && request.resource.data.status == 'Live'
-                    && request.resource.data.isPaid == false;
+                    && request.resource.data.isPaid is bool;
 
       // Update: Admin OR Strict Owner validation
       allow update: if request.auth != null && (
