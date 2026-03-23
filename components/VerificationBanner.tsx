@@ -14,11 +14,11 @@ const VerificationBanner: React.FC<VerificationBannerProps> = ({ onVerify, statu
                     'Verification email sent! Please check your inbox.'
                 ) : (
                     <>
-                        Your account is not verified. Please check your email or{' '}
+                        Your account is not verified. Please{' '}
                         <button onClick={onVerify} className="font-bold underline hover:text-yellow-900 focus:outline-none">
-                            click here to verify
+                            click here to send verification email
                         </button>
-                        {' '}to get full access.
+                        .
                     </>
                 )}
             </p>
