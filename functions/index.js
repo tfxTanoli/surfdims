@@ -191,11 +191,29 @@ exports.onBoardCreate = onDocumentWritten(
                     if (userDoc.id === afterData.sellerId || !user.alerts || user.alerts.length === 0) return;
 
                     const hasMatch = user.alerts.some(alert => {
-                        const brandMatch = !alert.brand || afterData.brand.toLowerCase().includes(alert.brand.toLowerCase());
-                        const modelMatch = !alert.model || afterData.model.toLowerCase().includes(alert.model.toLowerCase());
+                        // Determine alert type — treat missing type as 'keyword' for backward compatibility
+                        const isKeyword = !alert.type || alert.type === 'keyword';
+
+                        let textMatch;
+                        if (isKeyword) {
+                            // Keyword search: case-insensitive partial match across brand, model, description
+                            if (!alert.brand) {
+                                textMatch = true; // empty keyword matches all
+                            } else {
+                                const kw = alert.brand.toLowerCase();
+                                textMatch = (afterData.brand || '').toLowerCase().includes(kw)
+                                    || (afterData.model || '').toLowerCase().includes(kw)
+                                    || (afterData.description || '').toLowerCase().includes(kw);
+                            }
+                        } else {
+                            // Brand alert: match brand and model fields individually
+                            const brandMatch = !alert.brand || (afterData.brand || '').toLowerCase().includes(alert.brand.toLowerCase());
+                            const modelMatch = !alert.model || (afterData.model || '').toLowerCase().includes(alert.model.toLowerCase());
+                            textMatch = brandMatch && modelMatch;
+                        }
 
                         const dim = afterData.dimensions && afterData.dimensions[0];
-                        if (!dim) return brandMatch && modelMatch;
+                        if (!dim) return textMatch;
 
                         const volMatch = dim.volume >= alert.volumeMin && dim.volume <= alert.volumeMax;
                         const lenMatch = dim.length >= alert.lengthMin && dim.length <= alert.lengthMax;
@@ -204,7 +222,7 @@ exports.onBoardCreate = onDocumentWritten(
                         const setupMatch = alert.finSetup === 'All' || afterData.finSetup === alert.finSetup;
                         const systemMatch = alert.finSystem === 'All' || afterData.finSystem === alert.finSystem;
 
-                        return brandMatch && modelMatch && volMatch && lenMatch && widMatch && thickMatch && setupMatch && systemMatch;
+                        return textMatch && volMatch && lenMatch && widMatch && thickMatch && setupMatch && systemMatch;
                     });
 
                     if (hasMatch) {

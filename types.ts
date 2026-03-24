@@ -88,6 +88,7 @@ export interface FilterState {
 
 export interface Alert {
     id: string;
+    type?: 'brand' | 'keyword';
     brand: string;
     model: string;
     volumeMin: number;

@@ -1083,7 +1083,8 @@ const App: React.FC = () => {
 
         const newAlert: Alert = {
             id: Math.random().toString(36).substr(2, 9),
-            brand: filters.brand,
+            type: 'keyword',
+            brand: filters.brand.trim(),
             model: '',
             volumeMin: filters.minVolume,
             volumeMax: filters.maxVolume,
@@ -1123,6 +1124,7 @@ const App: React.FC = () => {
 
         const newAlert: Alert = {
             id: Math.random().toString(36).substr(2, 9),
+            type: 'brand',
             brand: pendingAlertBoard.brand,
             model: pendingAlertBoard.model,
             volumeMin: pendingAlertBoard.dimensions[0]?.volume || 0,
@@ -1207,10 +1209,11 @@ const App: React.FC = () => {
         }
     }, [currentUser, promptForAuth, boards, db]);
 
-    const handleAddAlert = useCallback((brand: string, model: string) => {
+    const handleAddAlert = useCallback((brand: string, model: string, type: 'brand' | 'keyword' = 'brand') => {
         if (!currentUser) return;
         const newAlert: Alert = {
             id: `alert-${Date.now()}`,
+            type,
             brand,
             model,
             volumeMin: 0,
@@ -1291,7 +1294,8 @@ const App: React.FC = () => {
 
         const newAlert: Alert = {
             id: Math.random().toString(36).substr(2, 9),
-            brand: filters.brand,
+            type: 'keyword',
+            brand: filters.brand.trim(),
             model: '',
             volumeMin: filters.minVolume,
             volumeMax: filters.maxVolume,
@@ -1328,9 +1332,9 @@ const App: React.FC = () => {
 
     const handleConfirmNotification = () => {
         if (notificationBoard) {
-            handleAddAlert(notificationBoard.brand, notificationBoard.model);
+            handleAddAlert(notificationBoard.brand, notificationBoard.model, 'brand');
         } else if (notificationSearchTerm) {
-            handleAddAlert(notificationSearchTerm, '');
+            handleAddAlert(notificationSearchTerm, '', 'keyword');
         }
         setIsNotificationModalOpen(false);
         setNotificationBoard(null);

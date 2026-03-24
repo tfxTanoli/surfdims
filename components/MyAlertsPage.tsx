@@ -31,13 +31,19 @@ const MyAlertsPage: React.FC<MyAlertsPageProps> = ({ currentUser, onClose, onDel
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {currentUser.alerts.map((alert, index) => (
                                     <div key={alert.id} className="border border-gray-200 rounded-xl p-6 relative bg-gray-50 hover:shadow-md transition">
-                                        <div className="absolute top-4 right-4 text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                            Alert #{index + 1}
+                                        <div className="absolute top-4 right-4">
+                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Alert #{index + 1}</span>
                                         </div>
-                                        
+
                                         <div className="space-y-2 mt-2">
-                                            <p><span className="font-bold text-gray-700">Brand:</span> {alert.brand || 'Any'}</p>
-                                            <p><span className="font-bold text-gray-700">Model:</span> {alert.model || 'Any'}</p>
+                                            {alert.type === 'keyword' || !alert.type ? (
+                                                <p><span className="font-bold text-[#e23030]">Keyword:</span> <span className="text-[#e23030]">{alert.brand || 'Any'}</span></p>
+                                            ) : (
+                                                <>
+                                                    <p><span className="font-bold text-gray-700">Brand:</span> {alert.brand || 'Any'}</p>
+                                                    <p><span className="font-bold text-gray-700">Model:</span> {alert.model || 'Any'}</p>
+                                                </>
+                                            )}
                                             <p><span className="font-bold text-gray-700">Volume:</span> {alert.volumeMin}-{alert.volumeMax}L</p>
                                             <p><span className="font-bold text-gray-700">Length:</span> {alert.lengthMin}-{alert.lengthMax}'</p>
                                             <p><span className="font-bold text-gray-700">Width:</span> {alert.widthMin}-{alert.widthMax}"</p>
