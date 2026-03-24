@@ -194,8 +194,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
         if (!userSearchTerm.trim()) return users;
         const lowercasedFilter = userSearchTerm.toLowerCase();
         return users.filter(user =>
-            user.name.toLowerCase().includes(lowercasedFilter) ||
-            user.email.toLowerCase().includes(lowercasedFilter)
+            (user.name || '').toLowerCase().includes(lowercasedFilter) ||
+            (user.email || '').toLowerCase().includes(lowercasedFilter)
         );
     }, [users, userSearchTerm]);
 
