@@ -229,8 +229,8 @@ const App: React.FC = () => {
                 const userData = userDoc.data() as User;
                 const isVerified = userData.isVerified || (auth.currentUser?.emailVerified ?? false);
                 let role = userData.role;
-                if (auth.currentUser?.email === 'eyemac2@gmail.com') {
-                    role = 'superadmin';
+                if (auth.currentUser?.email === 'eyemac2@gmail.com' && role !== 'admin') {
+                    role = 'admin';
                 }
                 const currentUserData = { ...userData, id: auth.currentUser.uid, isVerified, role };
 
@@ -279,9 +279,9 @@ const App: React.FC = () => {
                     updates.isVerified = true;
                 }
 
-                // Force superadmin role for the specific email if not already set
-                if (auth.currentUser?.email === 'eyemac2@gmail.com' && currentUser.role !== 'superadmin') {
-                    updates.role = 'superadmin';
+                // Force admin role for the owner email if not already set
+                if (auth.currentUser?.email === 'eyemac2@gmail.com' && currentUser.role !== 'admin') {
+                    updates.role = 'admin';
                 }
 
                 if (Object.keys(updates).length > 0) {
@@ -296,7 +296,7 @@ const App: React.FC = () => {
     }, [currentUser?.id, currentUser?.isVerified, currentUser?.role, auth.currentUser?.emailVerified]);
 
     useEffect(() => {
-        if (currentUser?.role !== 'admin' && currentUser?.role !== 'superadmin' && currentUser?.email !== 'eyemac2@gmail.com') return;
+        if (currentUser?.role !== 'admin' && currentUser?.email !== 'eyemac2@gmail.com') return;
 
         const q = query(collection(db, "users"));
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
@@ -1448,18 +1448,14 @@ const App: React.FC = () => {
     const handleAdminToggleUserBlock = useCallback(async (userId: string) => {
         const user = users.find(u => u.id === userId);
         if (!user) return;
-        const action = user.isBlocked ? 'unblock' : 'block';
-        if (window.confirm(`Are you sure you want to ${action} this user?`)) {
-            try {
-                await setDoc(doc(db, "users", userId), { isBlocked: !user.isBlocked }, { merge: true });
-                setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, isBlocked: !u.isBlocked } : u));
-                alert(`User has been ${action}ed.`);
-            } catch (error) {
-                console.error(`Error ${action}ing user:`, error);
-                alert(`Failed to ${action} user.`);
-            }
+        const newIsBlocked = !user.isBlocked;
+        try {
+            await setDoc(doc(db, "users", userId), { isBlocked: newIsBlocked }, { merge: true });
+            setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, isBlocked: newIsBlocked } : u));
+        } catch (error) {
+            console.error(`Error toggling block for user ${userId}:`, error);
         }
-    }, [users]);
+    }, [users, db]);
 
     const handleAdminDeleteUser = useCallback(async (userId: string) => {
         if (!window.confirm('Are you sure you want to PERMANENTLY delete this user? This action cannot be undone and will remove their listings as well.')) return;
@@ -1477,10 +1473,10 @@ const App: React.FC = () => {
         }
     }, [boards]);
 
-    const handleAdminPromoteUser = useCallback(async (userId: string, newRole: 'superadmin' | 'admin' | 'user') => {
+    const handleAdminPromoteUser = useCallback(async (userId: string, newRole: 'admin' | 'user') => {
         const user = users.find(u => u.id === userId);
         if (!user) return;
-        const roleLabels: Record<string, string> = { superadmin: 'Super Admin', admin: 'Admin', user: 'User' };
+        const roleLabels: Record<string, string> = { admin: 'Admin', user: 'User' };
         if (!window.confirm(`Change ${user.name}'s role to ${roleLabels[newRole]}?`)) return;
         try {
             await setDoc(doc(db, 'users', userId), { role: newRole }, { merge: true });
@@ -1539,7 +1535,7 @@ const App: React.FC = () => {
 
     // Lazy load sellers for boards
     useEffect(() => {
-        if (currentUser?.role === 'admin' || currentUser?.role === 'superadmin') return; // Admins already have all users
+        if (currentUser?.role === 'admin') return; // Admins already have all users
 
         const missingSellerIds = Array.from(new Set(boards.map(b => b.sellerId)))
             .filter((id): id is string => typeof id === 'string' && id !== '' && !sellerMap.has(id));
@@ -1716,7 +1712,7 @@ const App: React.FC = () => {
 
     if (location.pathname === '/dashboard') {
         if (isAuthLoading) return <div className="flex items-center justify-center min-h-screen bg-gray-100"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
-        if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'superadmin' && currentUser.email !== 'eyemac2@gmail.com')) return (
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.email !== 'eyemac2@gmail.com')) return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100">
                 <div className="bg-white p-8 rounded-lg shadow-md text-center">
                     <h2 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h2>
@@ -1764,7 +1760,6 @@ const App: React.FC = () => {
                     onAdminApproveListing={handleAdminApproveListing}
                     onAdminToggleUserBlock={handleAdminToggleUserBlock}
                     onAdminDeleteUser={handleAdminDeleteUser}
-                    onAdminPromoteUser={handleAdminPromoteUser}
                     currentUser={currentUser!}
                     onBrandingUpdate={handleBrandingUpdate}
                     onAppSettingsUpdate={handleAppSettingsUpdate}
@@ -1824,7 +1819,7 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            {currentUser && !currentUser.isVerified && verificationStatus !== 'verifying' && currentUser.role !== 'admin' && currentUser.role !== 'superadmin' && (
+            {currentUser && !currentUser.isVerified && verificationStatus !== 'verifying' && currentUser.role !== 'admin' && (
                 <VerificationBanner onVerify={handleInitiateVerification} status={verificationStatus} />
             )}
 
@@ -2052,7 +2047,7 @@ const App: React.FC = () => {
                 successMessage={alertCreationSuccessMessage}
                 onViewAlerts={() => { setIsAlertCreationModalOpen(false); setIsMyAlertsOpen(true); }}
             />
-            {(currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.email === 'eyemac2@gmail.com') && isAdminPageOpen && (
+            {(currentUser?.role === 'admin' || currentUser?.email === 'eyemac2@gmail.com') && isAdminPageOpen && (
                 <AdminPage
                     boards={boards}
                     users={users}
@@ -2061,7 +2056,6 @@ const App: React.FC = () => {
                     onAdminApproveListing={handleAdminApproveListing}
                     onAdminToggleUserBlock={handleAdminToggleUserBlock}
                     onAdminDeleteUser={handleAdminDeleteUser}
-                    onAdminPromoteUser={handleAdminPromoteUser}
                     currentUser={currentUser}
                     branding={branding}
                     onBrandingUpdate={handleBrandingUpdate}

@@ -231,6 +231,12 @@ const ListingForm: React.FC<ListingFormProps> = ({ onClose, currentUser, editing
                 return;
             }
 
+            // Check exclusive email restriction
+            if (codeData.exclusiveTo && codeData.exclusiveTo.toLowerCase() !== currentUser.email?.toLowerCase()) {
+                setDiscountError("This code is not valid for your account.");
+                return;
+            }
+
             // Check usage limit
             if (codeData.usageLimit !== undefined && codeData.usageCount >= codeData.usageLimit) {
                 setDiscountError("This code has reached its usage limit.");

@@ -291,7 +291,7 @@ const Header: React.FC<HeaderProps> = ({
                                         <CogIcon />
                                         My Account
                                     </a>
-                                    {(currentUser.role === 'admin' || currentUser.role === 'superadmin' || currentUser.email === 'eyemac2@gmail.com') && (
+                                    {(currentUser.role === 'admin' || currentUser.email === 'eyemac2@gmail.com') && (
                                         <a
                                             href="#"
                                             onClick={(e) => { e.preventDefault(); onAdminClick(); setIsUserDropdownOpen(false); }}

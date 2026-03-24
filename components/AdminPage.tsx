@@ -28,7 +28,6 @@ interface AdminPageProps {
     onAdminApproveListing: (boardId: string) => void;
     onAdminToggleUserBlock: (userId: string) => void;
     onAdminDeleteUser: (userId: string) => void;
-    onAdminPromoteUser: (userId: string, newRole: 'superadmin' | 'admin' | 'user') => void;
     currentUser: import('../types').User;
     onBrandingUpdate: (newBranding: BrandingState) => void;
     onAppSettingsUpdate: (newSettings: AppSettingsState) => void;
@@ -168,7 +167,7 @@ const BrandingManager: React.FC<{
     );
 };
 
-const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListing, onAdminApproveListing, onAdminToggleUserBlock, onAdminDeleteUser, onAdminPromoteUser, currentUser, onClose, branding, onBrandingUpdate, appSettings, onAppSettingsUpdate, giveawayImages, onGiveawayImagesUpdate, adminAds, onAdminAdsUpdate }) => {
+const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListing, onAdminApproveListing, onAdminToggleUserBlock, onAdminDeleteUser, currentUser, onClose, branding, onBrandingUpdate, appSettings, onAppSettingsUpdate, giveawayImages, onGiveawayImagesUpdate, adminAds, onAdminAdsUpdate }) => {
     const [activeTab, setActiveTab] = useState<'listings' | 'users' | 'branding' | 'apps' | 'giveaways' | 'discountCodes' | 'ads'>('listings');
     const [userSearchTerm, setUserSearchTerm] = useState('');
     const [listingSearchTerm, setListingSearchTerm] = useState('');
@@ -264,6 +263,7 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
             const id = `code-${Date.now()}`;
             const codeData: any = { ...code, createdAt: new Date().toISOString() };
             if (codeData.usageLimit === undefined) delete codeData.usageLimit;
+            if (!codeData.exclusiveTo || !codeData.exclusiveTo.trim()) delete codeData.exclusiveTo;
             await setDoc(doc(db, "discountCodes", id), codeData);
             alert('Discount code created successfully!');
         } catch (error: any) {
@@ -423,26 +423,12 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
                                     <>
                                         {paginatedUsers.map(user => {
                                             const isSelf = user.id === currentUser.id;
-                                            const callerIsSuperAdmin = currentUser.role === 'superadmin' || currentUser.email === 'eyemac2@gmail.com';
-                                            const targetIsSuperAdmin = user.role === 'superadmin';
                                             const targetIsAdmin = user.role === 'admin';
 
                                             // Role badge
-                                            const roleBadge = targetIsSuperAdmin
-                                                ? <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full bg-purple-100 text-purple-700 border border-purple-300">Super Admin</span>
-                                                : targetIsAdmin
-                                                    ? <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-300">Admin</span>
-                                                    : null;
-
-                                            // Who can do what:
-                                            // - superadmin: can promote users→admin, admin→superadmin, demote admin→user, demote superadmin→admin (not themselves)
-                                            // - admin: can only promote plain users→admin (cannot touch other admins or superadmins)
-                                            const canPromoteToAdmin = !isSelf && !targetIsAdmin && !targetIsSuperAdmin;
-                                            const canDemoteToUser = !isSelf && targetIsAdmin && !targetIsSuperAdmin && callerIsSuperAdmin;
-                                            const canPromoteToSuperAdmin = !isSelf && targetIsAdmin && callerIsSuperAdmin;
-                                            const canDemoteToAdmin = !isSelf && targetIsSuperAdmin && callerIsSuperAdmin;
-                                            const canDemoteAdminToUser = canDemoteToUser;
-                                            const canDemoteSuperAdminToAdmin = canDemoteToAdmin;
+                                            const roleBadge = targetIsAdmin
+                                                ? <span className="ml-2 px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-300">Admin</span>
+                                                : null;
 
                                             return (
                                                 <div key={user.id} className="bg-white p-3 rounded-lg shadow-sm border flex items-center gap-4">
@@ -455,45 +441,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
                                                         <p className="text-sm text-gray-500 truncate">{user.email}</p>
                                                     </div>
                                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                                        {/* Role management buttons */}
-                                                        {canPromoteToAdmin && (
-                                                            <button
-                                                                onClick={() => onAdminPromoteUser(user.id, 'admin')}
-                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition"
-                                                                title="Promote to Admin"
-                                                            >
-                                                                Make Admin
-                                                            </button>
-                                                        )}
-                                                        {canPromoteToSuperAdmin && (
-                                                            <button
-                                                                onClick={() => onAdminPromoteUser(user.id, 'superadmin')}
-                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-purple-500 hover:bg-purple-600 text-white transition"
-                                                                title="Promote to Super Admin"
-                                                            >
-                                                                Make Super Admin
-                                                            </button>
-                                                        )}
-                                                        {canDemoteAdminToUser && (
-                                                            <button
-                                                                onClick={() => onAdminPromoteUser(user.id, 'user')}
-                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-gray-500 hover:bg-gray-600 text-white transition"
-                                                                title="Demote to User"
-                                                            >
-                                                                Demote to User
-                                                            </button>
-                                                        )}
-                                                        {canDemoteSuperAdminToAdmin && (
-                                                            <button
-                                                                onClick={() => onAdminPromoteUser(user.id, 'admin')}
-                                                                className="text-xs font-semibold py-1 px-3 rounded-md bg-orange-500 hover:bg-orange-600 text-white transition"
-                                                                title="Demote to Admin"
-                                                            >
-                                                                Demote to Admin
-                                                            </button>
-                                                        )}
-                                                        {/* Block / Unblock - not for superadmins */}
-                                                        {!targetIsSuperAdmin && !isSelf && (
+                                                        {/* Block / Unblock */}
+                                                        {!isSelf && (
                                                             <button
                                                                 onClick={() => onAdminToggleUserBlock(user.id)}
                                                                 className={`w-24 text-sm font-semibold py-1 px-3 rounded-md ${user.isBlocked ? 'bg-yellow-500 hover:bg-yellow-600 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
@@ -501,8 +450,8 @@ const AdminPage: React.FC<AdminPageProps> = ({ boards, users, onAdminDeleteListi
                                                                 {user.isBlocked ? 'Unblock' : 'Block'}
                                                             </button>
                                                         )}
-                                                        {/* Delete - not for superadmins or self */}
-                                                        {!targetIsSuperAdmin && !isSelf && (
+                                                        {/* Delete - not self */}
+                                                        {!isSelf && (
                                                             <button
                                                                 onClick={() => {
                                                                     if (window.confirm('Are you sure you want to permanently delete this user and all their listings?')) {

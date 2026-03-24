@@ -22,13 +22,15 @@ const DiscountCodesManager: React.FC<DiscountCodesManagerProps> = ({ codes, onCr
         country: string;
         expiryDate: string;
         usageLimit?: number;
+        exclusiveTo?: string;
     }>({
         name: '',
         percentageOff: 100,
         appliesTo: 'Used',
         country: 'All',
         expiryDate: '',
-        usageLimit: undefined
+        usageLimit: undefined,
+        exclusiveTo: ''
     });
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -47,7 +49,7 @@ const DiscountCodesManager: React.FC<DiscountCodesManagerProps> = ({ codes, onCr
         try {
             await onCreate({ ...newCode, usageCount: 0 });
             setIsModalOpen(false);
-            setNewCode({ name: '', percentageOff: 100, appliesTo: 'Used', country: 'All', expiryDate: '', usageLimit: undefined });
+            setNewCode({ name: '', percentageOff: 100, appliesTo: 'Used', country: 'All', expiryDate: '', usageLimit: undefined, exclusiveTo: '' });
         } catch (error: any) {
             console.error("Submission failed:", error);
             // Error is already alerted in AdminPage, but we catch it here to stop the loading state
@@ -97,6 +99,11 @@ const DiscountCodesManager: React.FC<DiscountCodesManagerProps> = ({ codes, onCr
                             <p className="text-sm text-gray-600">
                                 Usage: <span className="font-semibold">{code.usageCount} / {code.usageLimit || '∞'}</span>
                             </p>
+                            {code.exclusiveTo && (
+                                <p className="text-sm text-[#e23030]">
+                                    Exclusive to: <span className="font-semibold">{code.exclusiveTo}</span>
+                                </p>
+                            )}
                         </div>
                         <p className="text-[10px] text-gray-400 mt-4">Created: {new Date(code.createdAt).toLocaleDateString()}</p>
                     </div>
@@ -166,6 +173,17 @@ const DiscountCodesManager: React.FC<DiscountCodesManagerProps> = ({ codes, onCr
                                         New boards
                                     </button>
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-[#e23030] mb-1">Exclusive to</label>
+                                <input
+                                    type="email"
+                                    disabled={isSubmitting}
+                                    value={newCode.exclusiveTo || ''}
+                                    onChange={e => setNewCode({ ...newCode, exclusiveTo: e.target.value })}
+                                    className="w-full px-3 py-2 border border-[#e23030] rounded-md focus:ring-2 focus:ring-[#e23030] outline-none text-[#e23030] placeholder-[#e23030]/50"
+                                    placeholder="Enter email (optional)"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>

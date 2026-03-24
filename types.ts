@@ -117,7 +117,7 @@ export interface User {
     notifications: AppNotification[];
     isBlocked: boolean;
     isVerified: boolean;
-    role?: 'superadmin' | 'admin' | 'user';
+    role?: 'admin' | 'user';
     createdAt: string;
 }
 
@@ -185,5 +185,6 @@ export interface DiscountCode {
     expiryDate: string;
     usageLimit?: number;
     usageCount: number;
+    exclusiveTo?: string; // optional email — if set, only that user can apply this code
     createdAt: string;
 }
